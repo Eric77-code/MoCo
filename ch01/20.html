@@ -1,1 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fetch GET Demo - 參數放在 URL</title>
+    
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            display: flex;
+            justify-content: center;
+            padding: 20px;
+        }
 
+        .json-output { 
+            background: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 600px;
+            text-align: center;
+        }
+
+        h1, h2 {
+            color: #333;
+            text-align: left;
+        }
+        
+        input[type="text"] {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+        
+        .console-hint {
+            margin-top: 20px;
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="json-output"> 
+        <h1>Fetch Demo</h1>
+        <h2>GET 請求參數放置</h2>
+        
+        <form id="dataForm">
+            <input type="text" id="nameInput" value="John" placeholder="Name" required>
+            <input type="text" id="surnameInput" value="Smith" placeholder="Surname" required>
+            <button type="submit" id="submitBtn">提交 GET 請求</button>
+        </form>
+
+        <p class="console-hint">按下 **F12**，在 Console 中查看產生的 URL 和伺服器結果。</p>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const form = document.getElementById('dataForm');
+            const nameInput = document.getElementById('nameInput');
+            const surnameInput = document.getElementById('surnameInput');
+            
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault(); 
+                
+                // 1. 取得參數
+                const name = nameInput.value;
+                const surname = surnameInput.value;
+                
+                // 2. 構造查詢參數
+                const params = new URLSearchParams({
+                    name: name,
+                    surname: surname
+                }).toString();
+
+                // 3. 將參數串接到 URL 後方 (使用 ? 分隔)
+                const baseUrl = 'https://httpcan.org/get';
+                const finalUrl = `${baseUrl}?${params}`;
+
+                // --- 僅在 Console 顯示發送的 URL ---
+                console.log('--- Request URL (GET) ---');
+                console.log(finalUrl); 
+
+                try {
+                    // 4. 發送 GET 請求 (預設就是 GET，且不需要 Body)
+                    const response = await fetch(finalUrl, {
+                        method: 'GET'
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP Error: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    
+                    // --- 顯示伺服器回傳的數據 ---
+                    console.log('--- Server Response (JSON) ---');
+                    console.log(data); 
+                    // httpcan.org 會將 GET 參數放在回傳資料的 'args' 屬性中
+                    console.log('解析後的參數 (args):', data.args);
+
+                } catch (error) {
+                    console.error('Fetch Error:', error.message);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
