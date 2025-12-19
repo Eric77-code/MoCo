@@ -1,1 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fetch JSON Demo - 修改為 json-output 類別</title>
+    
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            display: flex;
+            justify-content: center;
+            padding: 20px;
+        }
 
+        /* 關鍵修改點：將 .container 改為 .json-output */
+        .json-output { 
+            background: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 600px;
+            text-align: center;
+        }
+
+        h1, h2 {
+            color: #333;
+            text-align: left;
+        }
+        
+        input[type="text"] {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+        
+        .console-hint {
+            margin-top: 20px;
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="json-output"> 
+        <h1>Fetch Demo</h1>
+        <h2>JSON 資料格式</h2>
+        
+        <form id="dataForm">
+            <input type="text" id="nameInput" value="John" placeholder="Name" required>
+            <input type="text" id="surnameInput" value="Smith" placeholder="Surname" required>
+            <button type="submit" id="submitBtn">提交</button>
+        </form>
+
+        <p class="console-hint">按下 **F12**，在 Console 中查看提交的資料和伺服器回傳的結果。</p>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const form = document.getElementById('dataForm');
+            const nameInput = document.getElementById('nameInput');
+            const surnameInput = document.getElementById('surnameInput');
+            
+            // 監聽表單提交事件
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault(); 
+                
+                const name = nameInput.value;
+                const surname = surnameInput.value;
+                
+                // 1. 構造要發送的 JavaScript 物件
+                const userData = {
+                    name: name,
+                    surname: surname
+                };
+
+                // 2. 將 JavaScript 物件轉換為 JSON 字串
+                const jsonBody = JSON.stringify(userData);
+                const targetUrl = 'https://httpcan.org/post';
+
+                // --- 僅在 Console 顯示發送的數據 ---
+                console.log('--- Request Body (JSON) ---');
+                console.log(userData); 
+
+                try {
+                    const response = await fetch(targetUrl, {
+                        method: 'POST', 
+                        headers: {
+                            'Content-Type': 'application/json' 
+                        },
+                        body: jsonBody
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP Error: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    
+                    // --- 僅在 Console 顯示伺服器回傳的原始 JSON 數據 ---
+                    console.log('--- Server Response (JSON) ---');
+                    console.log(data); 
+
+                } catch (error) {
+                    // 只有在請求失敗時才輸出錯誤訊息
+                    console.error('Fetch Error:', error.message);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
