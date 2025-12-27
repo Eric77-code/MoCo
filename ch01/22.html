@@ -1,1 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>現代化視訊測試</title>
+    <style>
+        /* 整體基礎樣式 */
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            color: #333;
+        }
 
+        /* 容器卡片 */
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            text-align: center;
+            width: 90%;
+            max-width: 600px;
+        }
+
+        h2 { margin-bottom: 1.5rem; color: #4a4a4a; }
+
+        /* 視訊預覽框 */
+        .video-wrapper {
+            position: relative;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            aspect-ratio: 16 / 9;
+            margin-bottom: 1.5rem;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* 填滿框架不留黑邊 */
+        }
+
+        /* 狀態標籤 */
+        .status-badge {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.6);
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            background: #ccc;
+            border-radius: 50%;
+        }
+
+        .dot.active { background: #ff4d4d; animation: blink 1s infinite; }
+
+        /* 按鈕樣式 */
+        #btn {
+            background: #764ba2;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 1rem;
+            font-weight: 600;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(118, 75, 162, 0.3);
+        }
+
+        #btn:hover { background: #5a3a8a; transform: translateY(-2px); }
+        #btn:active { transform: translateY(0); }
+
+        @keyframes blink {
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>視訊裝置測試</h2>
+    
+    <div class="video-wrapper">
+        <div class="status-badge">
+            <div id="dot" class="dot"></div>
+            <span id="status-text">相機已關閉</span>
+        </div>
+        <video id="video" autoplay playsinline></video>
+    </div>
+
+    <button id="btn">啟用相機與麥克風</button>
+</div>
+
+<script>
+    const btn = document.getElementById('btn');
+    const video = document.getElementById('video');
+    const dot = document.getElementById('dot');
+    const statusText = document.getElementById('status-text');
+
+    btn.onclick = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { width: 1280, height: 720 }, // 請求高清畫質
+                audio: true
+            });
+
+            video.srcObject = stream;
+            
+            // 更新 UI 狀態
+            dot.classList.add('active');
+            statusText.innerText = '正在錄製中...';
+            btn.innerText = '裝置運行中';
+            btn.style.opacity = '0.7';
+            btn.disabled = true;
+
+        } catch (err) {
+            console.error(err);
+            alert('無法取得權限：' + err.message);
+        }
+    };
+</script>
+
+</body>
+</html>
