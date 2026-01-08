@@ -3,11 +3,11 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>農產品交易行情儀表板（純 JS）</title>
+    <title>農產品交易行情儀表板</title>
   </head>
 
   <body>
-    <h1>農產品交易行情儀表板（純 JavaScript）</h1>
+    <h1>農產品交易行情儀表板</h1>
 
     <h2>查詢條件</h2>
 
@@ -79,6 +79,512 @@
       <tbody id="tbody"></tbody>
     </table>
 
-    <script src="./app.js"></script>
+   <script>
+     // ===== 市場清單（下拉用）=====
+const ALL_MARKETS = [
+  { marketId: "104", marketName: "台北二" },
+  { marketId: "109", marketName: "台北一" },
+  { marketId: "220", marketName: "板橋區" },
+  { marketId: "241", marketName: "三重區" },
+  { marketId: "260", marketName: "宜蘭市" },
+  { marketId: "400", marketName: "台中市" },
+  { marketId: "514", marketName: "溪湖鎮" },
+  { marketId: "600", marketName: "嘉義市" },
+  { marketId: "700", marketName: "台南市場" },
+  { marketId: "800", marketName: "高雄市" },
+  { marketId: "900", marketName: "屏東市" },
+  { marketId: "950", marketName: "花蓮市" },
+  { marketId: "423", marketName: "東勢鎮" },
+  { marketId: "105", marketName: "台北市場" },
+  { marketId: "338", marketName: "桃農" },
+  { marketId: "420", marketName: "豐原區" },
+  { marketId: "540", marketName: "南投市" },
+  { marketId: "830", marketName: "鳳山區" },
+  { marketId: "512", marketName: "永靖鄉" },
+  { marketId: "648", marketName: "西螺鎮" },
+];
+
+// ===== 市場座標（定位找最近用）=====
+const MARKET_LOCATIONS = [
+  { marketId: "104", marketName: "台北二", lat: 25.062361, lng: 121.511934 },
+  { marketId: "109", marketName: "台北一", lat: 25.0452, lng: 121.5076 },
+  { marketId: "220", marketName: "板橋區", lat: 25.0113, lng: 121.4625 },
+  { marketId: "241", marketName: "三重區", lat: 25.0632, lng: 121.4889 },
+  { marketId: "260", marketName: "宜蘭市", lat: 24.7571, lng: 121.7537 },
+  { marketId: "400", marketName: "台中市", lat: 24.1442, lng: 120.6816 },
+  { marketId: "514", marketName: "溪湖鎮", lat: 23.95794202785315, lng: 120.48569114534014 },
+  { marketId: "648", marketName: "西螺鎮", lat: 23.784121897964496, lng: 120.4481101613821 },
+  { marketId: "700", marketName: "台南市場", lat: 22.9972, lng: 120.2123 },
+  { marketId: "800", marketName: "高雄市", lat: 22.6346, lng: 120.3081 },
+  { marketId: "900", marketName: "屏東市", lat: 22.6690, lng: 120.4864 },
+  { marketId: "930", marketName: "台東市", lat: 22.7554, lng: 121.15 },
+  { marketId: "950", marketName: "花蓮市", lat: 23.9872, lng: 121.6015 },
+];
+
+
+// ===== 農業部 API =====
+const MOA_URL = "https://data.moa.gov.tw/Service/OpenData/FromM/FarmTransData.aspx";
+
+// ===== DOM =====
+const $ = (id) => document.getElementById(id);
+const elCrop = $("cropName");
+const elStart = $("startDate");
+const elEnd = $("endDate");
+const elMarket = $("marketSelect");
+const elMarketsInfo = $("marketsInfo");
+const elLocBtn = $("locBtn");
+const elQueryBtn = $("queryBtn");
+const elLocMsg = $("locMsg");
+const elError = $("errorBox");
+const elTbody = $("tbody");
+const elTableHint = $("tableHint");
+const elChart = $("chart");
+const elChartHint = $("chartHint");
+
+const elKpi1 = $("kpi1");
+const elKpi2 = $("kpi2");
+const elKpi3 = $("kpi3");
+const elKpi4 = $("kpi4");
+
+// ===== state（純 JS 用一般物件）=====
+const state = {
+  filters: {
+    cropName: "花椰菜-青梗",
+    startDateRoc: todayRoc(),
+    endDateRoc: todayRoc(),
+    marketId: "",
+    marketName: "",
+    lat: null,
+    lng: null,
+  },
+  rows: [],
+  locating: false,
+};
+
+// ===== init =====
+init();
+
+function init() {
+  // 初始值
+  elCrop.value = state.filters.cropName;
+  elStart.value = state.filters.startDateRoc;
+  elEnd.value = state.filters.endDateRoc;
+
+  // 市場下拉
+  renderMarketSelect();
+  renderMarketsInfo();
+
+  // 事件
+  elCrop.addEventListener("input", (e) => {
+    state.filters.cropName = e.target.value.trim();
+  });
+  elStart.addEventListener("input", (e) => {
+    state.filters.startDateRoc = e.target.value.trim();
+  });
+  elEnd.addEventListener("input", (e) => {
+    state.filters.endDateRoc = e.target.value.trim();
+  });
+  elMarket.addEventListener("change", (e) => {
+    const id = e.target.value;
+    const m = ALL_MARKETS.find((x) => x.marketId === id);
+    state.filters.marketId = id;
+    state.filters.marketName = m ? m.marketName : "";
+    elLocMsg.textContent = "";
+    renderMarketsInfo();
+  });
+
+  elLocBtn.addEventListener("click", handleLocate);
+  elQueryBtn.addEventListener("click", handleQuery);
+
+  resetOutputs();
+}
+
+function renderMarketSelect() {
+  elMarket.innerHTML = "";
+  const opt0 = document.createElement("option");
+  opt0.value = "";
+  opt0.textContent = "（不選市場）";
+  elMarket.appendChild(opt0);
+
+  for (const m of ALL_MARKETS) {
+    const opt = document.createElement("option");
+    opt.value = m.marketId;
+    opt.textContent = `${m.marketName}（${m.marketId}）`;
+    elMarket.appendChild(opt);
+  }
+}
+
+function renderMarketsInfo() {
+  const id = state.filters.marketId;
+  const name = state.filters.marketName;
+  elMarketsInfo.textContent =
+    `市場數：${ALL_MARKETS.length}｜目前市場：` +
+    (id ? `${name || ""}（${id}）` : "未指定");
+}
+
+// ===== 定位 =====
+async function handleLocate() {
+  elLocMsg.textContent = "";
+  if (state.locating) return;
+
+  if (!navigator.geolocation) {
+    elLocMsg.textContent = "此瀏覽器不支援定位功能，請改用手動選擇市場。";
+    return;
+  }
+
+  state.locating = true;
+  elLocBtn.disabled = true;
+  elLocBtn.textContent = "定位中…";
+
+  try {
+    const pos = await getPos({ enableHighAccuracy: true, timeout: 12000, maximumAge: 0 })
+      .catch(() => getPos({ enableHighAccuracy: false, timeout: 12000, maximumAge: 60000 }));
+
+    const lat = pos.coords.latitude;
+    const lng = pos.coords.longitude;
+    console.log("【DEBUG】使用者定位座標 lat/lng =", lat, lng);
+
+    state.filters.lat = lat;
+    state.filters.lng = lng;
+
+    const best = nearestMarket(lat, lng);
+    if (!best) {
+      elLocMsg.textContent = "定位成功，但找不到最近市場（市場座標資料不足）。請手動選擇市場。";
+      return;
+    }
+
+    state.filters.marketId = best.marketId;
+    state.filters.marketName = best.marketName;
+    elMarket.value = best.marketId;
+
+    elLocMsg.textContent = `已定位到最近市場：${best.marketName}（約 ${best.distanceKm} km）`;
+    renderMarketsInfo();
+  } catch {
+    elLocMsg.textContent = "定位失敗：請允許定位或移到訊號較好的地方，再重試。";
+  } finally {
+    state.locating = false;
+    elLocBtn.disabled = false;
+    elLocBtn.textContent = "取得定位（找最近市場）";
+  }
+}
+
+function getPos(opts) {
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(resolve, reject, opts);
+  });
+}
+
+function nearestMarket(lat, lng) {
+  if (!Array.isArray(MARKET_LOCATIONS) || MARKET_LOCATIONS.length === 0) return null;
+
+  let best = null;
+  for (const m of MARKET_LOCATIONS) {
+    const d = haversineKm({ lat, lng }, { lat: m.lat, lng: m.lng });
+    if (!best || d < best.distanceKm) {
+      best = {
+        marketId: m.marketId,
+        marketName: m.marketName,
+        distanceKm: Number(d.toFixed(2)),
+      };
+    }
+  }
+  return best;
+}
+
+// ===== 查詢行情（直接打農業部）=====
+async function handleQuery() {
+  elError.textContent = "";
+  state.rows = [];
+  resetOutputs();
+
+  const startDate = state.filters.startDateRoc;
+  const endDate = state.filters.endDateRoc;
+  if (!startDate || !endDate) {
+    elError.textContent = "錯誤：startDate / endDate 不可為空";
+    return;
+  }
+
+  elError.textContent = "查詢中…";
+
+  try {
+    const rawRows = await fetchFarmTransData({
+      startDateRoc: startDate,
+      endDateRoc: endDate,
+      top: 3000,
+      maxPages: 4,
+    });
+
+    const filtered = filterRows(rawRows, {
+      cropName: state.filters.cropName || undefined,
+      marketId: state.filters.marketId || undefined,
+    });
+
+    state.rows = filtered;
+    elError.textContent = "";
+
+    if (filtered.length === 0) {
+      elError.textContent = "提示：此條件下查無資料，請調整日期 / 市場 / 作物。";
+    }
+
+    renderAll();
+  } catch {
+    elError.textContent = "錯誤：取得行情失敗（可能是政府資料端暫時無回應）";
+  }
+}
+
+async function fetchFarmTransData(params) {
+  const top = params.top || 3000;
+  const maxPages = params.maxPages || 4;
+  const all = [];
+
+  for (let page = 0; page < maxPages; page++) {
+    const skip = page * top;
+
+    const u = new URL(MOA_URL);
+    u.searchParams.set("FOTT", "JSON");
+    u.searchParams.set("IsTransData", "1");
+    u.searchParams.set("UnitId", "037");
+    u.searchParams.set("$top", String(top));
+    u.searchParams.set("$skip", String(skip));
+    u.searchParams.set("StartDate", params.startDateRoc);
+    u.searchParams.set("EndDate", params.endDateRoc);
+
+    const res = await fetch(u.toString(), { cache: "no-store" });
+    if (!res.ok) throw new Error("MOA fetch failed");
+
+    const ct = res.headers.get("content-type") || "";
+    if (!ct.includes("json")) throw new Error("MOA response not JSON");
+
+    const raw = await res.json();
+    for (const r of raw) all.push(normalizeRow(r));
+    if (raw.length < top) break;
+  }
+
+  return all;
+}
+
+function filterRows(rows, opt) {
+  const crop = (opt.cropName || "").trim();
+  const mid = (opt.marketId || "").trim();
+
+  return rows.filter((r) => {
+    const okCrop = crop ? (r.cropName || "") === crop : true;
+    const okMid = mid ? (r.marketId || "") === mid : true;
+    return okCrop && okMid;
+  });
+}
+
+// ===== 資料整理 =====
+function normalizeRow(raw) {
+  const date = rocToIso(String(raw["交易日期"] || "").trim());
+  return {
+    date,
+    cropName: String(raw["作物名稱"] || "").trim(),
+    marketId: String(raw["市場代號"] || "").trim(),
+    marketName: String(raw["市場名稱"] || "").trim(),
+    high: toNumberOrNull(raw["上價(元_公斤)"] ?? raw["上價"]),
+    mid: toNumberOrNull(raw["中價(元_公斤)"] ?? raw["中價"]),
+    low: toNumberOrNull(raw["下價(元_公斤)"] ?? raw["下價"]),
+    avg: toNumberOrNull(raw["平均價(元_公斤)"] ?? raw["平均價"]),
+    volume: toNumberOrNull(raw["交易量(公斤)"] ?? raw["交易量"]),
+  };
+}
+
+function toNumberOrNull(v) {
+  if (v === null || v === undefined) return null;
+  const s = String(v).trim().replace(/,/g, "");
+  if (s === "" || s === "-") return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+}
+
+// ===== KPI / Chart / Table =====
+function resetOutputs() {
+  elKpi1.textContent = "最新均價：—";
+  elKpi2.textContent = "最新交易量：—";
+  elKpi3.textContent = "區間均價（加權）：—";
+  elKpi4.textContent = "區間總量：—";
+  elChartHint.textContent = "尚無資料（請先查詢）。";
+  elTableHint.textContent = "尚無資料（請先查詢）。";
+  elTbody.innerHTML = "";
+  clearCanvas();
+}
+
+function renderAll() {
+  renderKpis();
+  renderChart();
+  renderTable();
+}
+
+function renderKpis() {
+  const rows = state.rows;
+  if (!rows.length) return;
+
+  const latestDate = rows.map((r) => r.date).sort().at(-1) || "";
+  const latestRows = rows.filter((r) => r.date === latestDate);
+
+  const latestAvgList = latestRows.map((r) => r.avg).filter((x) => x != null);
+  const latestAvg = latestAvgList.length ? latestAvgList.reduce((a, b) => a + b, 0) / latestAvgList.length : null;
+
+  const latestVolList = latestRows.map((r) => r.volume).filter((x) => x != null);
+  const latestVol = latestVolList.length ? latestVolList.reduce((a, b) => a + b, 0) : null;
+
+  const volAll = rows.map((r) => r.volume).filter((x) => x != null);
+  const rangeTotalVol = volAll.length ? volAll.reduce((a, b) => a + b, 0) : null;
+
+  let wSum = 0, vSum = 0;
+  for (const r of rows) {
+    if (r.avg == null || r.volume == null) continue;
+    wSum += r.avg * r.volume;
+    vSum += r.volume;
+  }
+  const rangeAvg = vSum > 0 ? wSum / vSum : null;
+
+  elKpi1.textContent = `最新均價（${latestDate || "—"}）：${fmt(latestAvg, 1)} 元/公斤`;
+  elKpi2.textContent = `最新交易量（${latestDate || "—"}）：${fmtInt(latestVol)} 公斤`;
+  elKpi3.textContent = `區間均價（加權）：${fmt(rangeAvg, 1)} 元/公斤`;
+  elKpi4.textContent = `區間總量：${fmtInt(rangeTotalVol)} 公斤`;
+}
+
+function renderChart() {
+  const rows = state.rows;
+  if (!rows.length) return;
+
+  const pts = rows
+    .filter((r) => r.date && r.avg != null)
+    .map((r) => ({ x: r.date, y: r.avg }))
+    .sort((a, b) => a.x.localeCompare(b.x));
+
+  if (!pts.length) return;
+
+  elChartHint.textContent = "";
+  drawLineChart(pts);
+}
+
+function renderTable() {
+  const rows = state.rows;
+  if (!rows.length) {
+    elTableHint.textContent = "查無資料。";
+    return;
+  }
+
+  elTableHint.textContent = "";
+  elTbody.innerHTML = "";
+
+  for (const r of rows) {
+    const tr = document.createElement("tr");
+
+    tr.appendChild(td(r.date || "—"));
+    tr.appendChild(td(r.cropName || "—"));
+    tr.appendChild(td(`${r.marketName || "—"}（${r.marketId || "—"}）`));
+    tr.appendChild(td(`${fmt(r.high,1)} / ${fmt(r.mid,1)} / ${fmt(r.low,1)} / ${fmt(r.avg,1)}`));
+    tr.appendChild(td(fmtInt(r.volume)));
+
+    elTbody.appendChild(tr);
+  }
+}
+
+function td(text) {
+  const el = document.createElement("td");
+  el.textContent = String(text);
+  return el;
+}
+
+// ===== Canvas 折線圖（最簡）=====
+function clearCanvas() {
+  const ctx = elChart.getContext("2d");
+  ctx.clearRect(0, 0, elChart.width, elChart.height);
+}
+
+function drawLineChart(points) {
+  const ctx = elChart.getContext("2d");
+  const W = elChart.width, H = elChart.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const padL = 50, padR = 20, padT = 20, padB = 40;
+  const innerW = W - padL - padR;
+  const innerH = H - padT - padB;
+
+  const ys = points.map(p => p.y);
+  const yMin = Math.min(...ys);
+  const yMax = Math.max(...ys);
+  const ySpan = (yMax - yMin) || 1;
+
+  const n = points.length;
+
+  // axes
+  ctx.strokeStyle = "#000";
+  ctx.beginPath();
+  ctx.moveTo(padL, padT);
+  ctx.lineTo(padL, H - padB);
+  ctx.lineTo(W - padR, H - padB);
+  ctx.stroke();
+
+  // line
+  ctx.strokeStyle = "#000";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  points.forEach((p, i) => {
+    const x = padL + (n === 1 ? 0 : (i / (n - 1)) * innerW);
+    const y = padT + (1 - ((p.y - yMin) / ySpan)) * innerH;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  // labels
+  ctx.fillStyle = "#000";
+  ctx.font = "12px sans-serif";
+  ctx.fillText(points[0].x, padL, H - 10);
+  const last = points[n - 1].x;
+  ctx.fillText(last, W - padR - ctx.measureText(last).width, H - 10);
+  ctx.fillText(yMax.toFixed(1), 5, padT + 10);
+  ctx.fillText(yMin.toFixed(1), 5, H - padB);
+}
+
+// ===== 日期工具 =====
+function todayRoc() {
+  const d = new Date();
+  const y = d.getFullYear() - 1911;
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}.${m}.${day}`;
+}
+
+function rocToIso(roc) {
+  const s = String(roc || "").trim();
+  const parts = s.split(".");
+  if (parts.length !== 3) return s;
+  const y = Number(parts[0]) + 1911;
+  const m = String(parts[1]).padStart(2, "0");
+  const d = String(parts[2]).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+// ===== 距離 Haversine =====
+function haversineKm(a, b) {
+  const R = 6371;
+  const dLat = deg2rad(b.lat - a.lat);
+  const dLng = deg2rad(b.lng - a.lng);
+  const s1 =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(deg2rad(a.lat)) * Math.cos(deg2rad(b.lat)) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(s1), Math.sqrt(1 - s1));
+  return R * c;
+}
+function deg2rad(v) { return (v * Math.PI) / 180; }
+
+// ===== format =====
+function fmt(n, digits) {
+  if (n == null) return "—";
+  return Number(n).toFixed(digits);
+}
+function fmtInt(n) {
+  if (n == null) return "—";
+  return Math.round(Number(n)).toLocaleString();
+}
+
+     </script>
   </body>
 </html>
