@@ -3,11 +3,11 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>農產品交易行情儀表板</title>
+    <title>農產品交易行情儀表板（純 JS）</title>
   </head>
 
   <body>
-    <h1>農產品交易行情儀表板</h1>
+    <h1>農產品交易行情儀表板（純 JavaScript）</h1>
 
     <h2>查詢條件</h2>
 
@@ -79,8 +79,8 @@
       <tbody id="tbody"></tbody>
     </table>
 
-   <script>
-     // ===== 市場清單（下拉用）=====
+    <script>
+      // ===== 市場清單（下拉用）=====
 const ALL_MARKETS = [
   { marketId: "104", marketName: "台北二" },
   { marketId: "109", marketName: "台北一" },
@@ -364,12 +364,23 @@ async function fetchFarmTransData(params) {
 }
 
 function filterRows(rows, opt) {
-  const crop = (opt.cropName || "").trim();
+  // 先把關鍵字準備好，並去除前後空白
+  const cropKeyword = (opt.cropName || "").trim();
   const mid = (opt.marketId || "").trim();
 
   return rows.filter((r) => {
-    const okCrop = crop ? (r.cropName || "") === crop : true;
-    const okMid = mid ? (r.marketId || "") === mid : true;
+    // 1. 作物篩選邏輯
+    // 如果沒輸入關鍵字，就代表「不篩選作物」，直接給 true
+    // 如果有輸入，則檢查 r.cropName 是否包含關鍵字（加上安全檢查防止 null）
+    const okCrop = cropKeyword === "" 
+      ? true 
+      : (r.cropName && r.cropName.includes(cropKeyword));
+
+    // 2. 市場篩選邏輯
+    const okMid = mid === "" 
+      ? true 
+      : (r.marketId === mid);
+
     return okCrop && okMid;
   });
 }
@@ -585,6 +596,6 @@ function fmtInt(n) {
   return Math.round(Number(n)).toLocaleString();
 }
 
-     </script>
+    </script>
   </body>
 </html>
